@@ -2,26 +2,34 @@ from PIL import Image
 import operator
 from collections import deque
 from io import StringIO
+import os
+
 
 def add_tuple(a, b):
     return tuple(map(operator.add, a, b))
 
+
 def sub_tuple(a, b):
     return tuple(map(operator.sub, a, b))
+
 
 def neg_tuple(a):
     return tuple(map(operator.neg, a))
 
+
 def direction(edge):
     return sub_tuple(edge[1], edge[0])
 
+
 def magnitude(a):
-    return int(pow(pow(a[0], 2) + pow(a[1], 2), .5))
+    return int(pow(pow(a[0], 2) + pow(a[1], 2), 0.5))
+
 
 def normalize(a):
     mag = magnitude(a)
     assert mag > 0, "Cannot normalize a zero-length vector"
-    return tuple(map(operator.truediv, a, [mag]*len(a)))
+    return tuple(map(operator.truediv, a, [mag] * len(a)))
+
 
 def svg_header(width, height):
     return """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -29,17 +37,23 @@ def svg_header(width, height):
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="%d" height="%d"
      xmlns="http://www.w3.org/2000/svg" version="1.1">
-""" % (width, height)    
+""" % (
+        width,
+        height,
+    )
+
 
 def joined_edges(assorted_edges, keep_every_point=False):
     pieces = []
     piece = []
-    directions = deque([
-        (0, 1),
-        (1, 0),
-        (0, -1),
-        (-1, 0),
-        ])
+    directions = deque(
+        [
+            (0, 1),
+            (1, 0),
+            (0, -1),
+            (-1, 0),
+        ]
+    )
     while assorted_edges:
         if not piece:
             piece.append(assorted_edges.pop())
@@ -57,23 +71,25 @@ def joined_edges(assorted_edges, keep_every_point=False):
                 else:
                     piece.append(next_edge)
                 if piece[0][0] == piece[-1][1]:
-                    if not keep_every_point and normalize(direction(piece[0])) == normalize(direction(piece[-1])):
+                    if not keep_every_point and normalize(
+                        direction(piece[0])
+                    ) == normalize(direction(piece[-1])):
                         piece[-1] = (piece[-1][0], piece.pop(0)[1])
                         # same direction
                     pieces.append(piece)
                     piece = []
                 break
         else:
-            raise Exception ("Failed to find connecting edge")
+            raise Exception("Failed to find connecting edge")
     return pieces
 
-def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
 
+def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
     # collect contiguous pixel groups
-    
+
     adjacent = ((1, 0), (0, 1), (-1, 0), (0, -1))
     visited = Image.new("1", im.size, 0)
-    
+
     color_pixel_lists = {}
 
     width, height = im.size
@@ -92,7 +108,9 @@ def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
                 here = queue.pop()
                 for offset in adjacent:
                     neighbour = add_tuple(here, offset)
-                    if not (0 <= neighbour[0] < width) or not (0 <= neighbour[1] < height):
+                    if not (0 <= neighbour[0] < width) or not (
+                        0 <= neighbour[1] < height
+                    ):
                         continue
                     if visited.getpixel(neighbour):
                         continue
@@ -113,12 +131,12 @@ def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
     # calculate clockwise edges of pixel groups
 
     edges = {
-        (-1, 0):((0, 0), (0, 1)),
-        (0, 1):((0, 1), (1, 1)),
-        (1, 0):((1, 1), (1, 0)),
-        (0, -1):((1, 0), (0, 0)),
-        }
-            
+        (-1, 0): ((0, 0), (0, 1)),
+        (0, 1): ((0, 1), (1, 1)),
+        (1, 0): ((1, 1), (1, 0)),
+        (0, -1): ((1, 0), (0, 0)),
+    }
+
     color_edge_lists = {}
 
     for rgba, pieces in color_pixel_lists.items():
@@ -147,7 +165,9 @@ def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
     for color, pieces in color_edge_lists.items():
         color_joined_pieces[color] = []
         for assorted_edges in pieces:
-            color_joined_pieces[color].append(joined_edges(assorted_edges, keep_every_point))
+            color_joined_pieces[color].append(
+                joined_edges(assorted_edges, keep_every_point)
+            )
 
     s = StringIO()
     s.write(svg_header(*im.size))
@@ -162,10 +182,14 @@ def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
                     here = edge[0]
                     s.write(""" L %d,%d """ % here)
                 s.write(""" Z """)
-            s.write(""" " style="fill:rgb%s; fill-opacity:%.3f; stroke:none;" />\n""" % (color[0:3], float(color[3]) / 255))
-            
+            s.write(
+                """ " style="fill:rgb%s; fill-opacity:%.3f; stroke:none;" />\n"""
+                % (color[0:3], float(color[3]) / 255)
+            )
+
     s.write("""</svg>\n""")
     return s.getvalue()
+
 
 def rgba_image_to_svg_pixels(im, opaque=None):
     s = StringIO()
@@ -178,16 +202,26 @@ def rgba_image_to_svg_pixels(im, opaque=None):
             rgba = im.getpixel(here)
             if opaque and not rgba[3]:
                 continue
-            s.write("""  <rect x="%d" y="%d" width="1" height="1" style="fill:rgb%s; fill-opacity:%.3f; stroke:none;" />\n""" % (x, y, rgba[0:3], float(rgba[2]) / 255))
+            s.write(
+                """  <rect x="%d" y="%d" width="1" height="1" style="fill:rgb%s; fill-opacity:%.3f; stroke:none;" />\n"""
+                % (x, y, rgba[0:3], float(rgba[2]) / 255)
+            )
     s.write("""</svg>\n""")
     return s.getvalue()
 
-def main():
-    image = Image.open('examples/angular.png').convert('RGBA')
-    svg_image = rgba_image_to_svg_contiguous(image)
-    #svg_image = rgba_image_to_svg_pixels(image)
-    with open("examples/angular.svg", "w") as text_file:
-        text_file.write(svg_image)
 
-if __name__ == '__main__':
+def main():
+    dir = os.path.dirname(__file__) + "/examples/"
+    contenido = os.listdir(dir)
+    print(contenido)
+    for fichero in contenido:
+        image = Image.open("examples/" + fichero).convert("RGBA")
+        svg_image = rgba_image_to_svg_contiguous(image)
+        # svg_image = rgba_image_to_svg_pixels(image)
+        name = fichero.split(".")[0]
+        with open("examples/" + name + ".svg", "w") as text_file:
+            text_file.write(svg_image)
+
+
+if __name__ == "__main__":
     main()
